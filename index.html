@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClipViral — AI Short Video Cutter</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#08080f;
+  --s1:#111119;
+  --s2:#18181f;
+  --s3:#222230;
+  --s4:#2d2d3d;
+  --accent:#ff2d55;
+  --accent2:#ff6b35;
+  --gold:#ffd60a;
+  --green:#30d158;
+  --blue:#0a84ff;
+  --purple:#bf5af2;
+  --text:#f5f5fa;
+  --muted:#8e8ea0;
+  --border:rgba(255,255,255,.08);
+  --border2:rgba(255,255,255,.13);
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;overflow-x:hidden}
+
+/* ---- TOPBAR ---- */
+.topbar{height:52px;background:rgba(8,8,15,.9);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:100}
+.logo{font-family:'Syne',sans-serif;font-size:20px;font-weight:900;background:linear-gradient(90deg,var(--accent),var(--accent2),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.logo-tag{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:400;color:var(--muted);-webkit-text-fill-color:var(--muted);margin-left:8px;vertical-align:middle}
+.version-badge{background:linear-gradient(135deg,rgba(255,45,85,.2),rgba(255,107,53,.2));border:1px solid rgba(255,45,85,.3);color:var(--accent);font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;letter-spacing:.5px}
+.topbar-right{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--muted)}
+.topbar-right b{color:var(--text)}
+
+/* ---- LAYOUT ---- */
+.layout{display:grid;grid-template-columns:1fr 320px;height:calc(100vh - 52px)}
+.main-col{overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:20px}
+.side-col{overflow-y:auto;background:var(--s1);border-left:1px solid var(--border);padding:20px;display:flex;flex-direction:column;gap:18px}
+
+/* ---- UPLOAD ZONE ---- */
+.upload-zone{border:1.5px dashed rgba(255,255,255,.12);border-radius:16px;background:var(--s1);padding:52px 24px;text-align:center;cursor:pointer;transition:all .25s;display:flex;flex-direction:column;align-items:center;gap:14px;position:relative;overflow:hidden}
+.upload-zone::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(255,45,85,.06) 0%,transparent 60%);pointer-events:none}
+.upload-zone:hover{border-color:var(--accent);background:rgba(255,45,85,.04)}
+.upload-zone.dragover{border-color:var(--accent);background:rgba(255,45,85,.08);transform:scale(1.01)}
+.upload-icon-wrap{width:72px;height:72px;background:linear-gradient(135deg,rgba(255,45,85,.15),rgba(255,107,53,.1));border:1px solid rgba(255,45,85,.2);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:32px}
+.upload-zone h2{font-family:'Syne',sans-serif;font-size:22px;font-weight:700}
+.upload-zone p{font-size:13px;color:var(--muted);max-width:320px;line-height:1.6}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;border:none;padding:10px 24px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif}
+.btn-primary:hover{opacity:.88;transform:translateY(-1px)}
+.btn-primary:active{transform:translateY(0)}
+#fileInput{display:none}
+.supported-formats{display:flex;gap:8px;margin-top:4px}
+.fmt-tag{font-size:10px;padding:3px 8px;border-radius:6px;background:var(--s3);color:var(--muted);border:1px solid var(--border)}
+
+/* ---- VIDEO PLAYER ---- */
+.player-card{background:var(--s1);border-radius:16px;overflow:hidden;border:1px solid var(--border)}
+.player-wrap{position:relative;background:#000;aspect-ratio:16/9;cursor:pointer}
+#mainVideo{width:100%;height:100%;display:block;object-fit:contain}
+.player-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}
+.player-wrap:hover .player-overlay{opacity:1}
+.play-btn-big{width:64px;height:64px;background:rgba(0,0,0,.6);border:2px solid rgba(255,255,255,.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;backdrop-filter:blur(8px)}
+.player-controls{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.time-display{display:flex;justify-content:space-between;font-size:12px;font-weight:500}
+.time-display span{color:var(--muted)}
+.time-display b{color:var(--text)}
+#seekBar{width:100%;height:4px;background:var(--s3);border-radius:2px;outline:none;-webkit-appearance:none;appearance:none;cursor:pointer}
+#seekBar::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 0 3px rgba(255,45,85,.2)}
+.ctrl-row{display:flex;align-items:center;gap:10px}
+.ctrl-btn{background:var(--s3);border:1px solid var(--border);color:var(--text);width:36px;height:36px;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.ctrl-btn:hover{background:var(--s4);border-color:var(--border2)}
+.ctrl-btn.play-pause{background:var(--accent);border-color:var(--accent);width:44px;height:44px;border-radius:10px;font-size:18px}
+.ctrl-btn.play-pause:hover{opacity:.85}
+.vol-row{display:flex;align-items:center;gap:8px;margin-left:auto}
+#volBar{width:72px;height:3px;background:var(--s3);border-radius:2px;outline:none;-webkit-appearance:none;appearance:none;cursor:pointer}
+#volBar::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--text);cursor:pointer}
+.filename-label{font-size:12px;color:var(--muted);text-align:center;padding:0 16px 12px}
+
+/* ---- TRIM SECTION ---- */
+.section-card{background:var(--s1);border-radius:16px;padding:18px;border:1px solid var(--border)}
+.section-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;letter-spacing:.3px}
+.section-title .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+
+/* timeline */
+.timeline-container{position:relative;height:72px;background:var(--s2);border-radius:10px;overflow:visible;margin-bottom:10px;border:1px solid var(--border)}
+.waveform-canvas{position:absolute;inset:0;width:100%;height:100%;border-radius:9px}
+.trim-overlay{position:absolute;top:0;bottom:0;background:rgba(255,45,85,.12);pointer-events:none}
+.trim-handle{position:absolute;top:0;bottom:0;width:3px;background:var(--accent);cursor:ew-resize;z-index:10}
+.trim-handle::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:16px;height:32px;background:var(--accent);border-radius:4px;cursor:ew-resize}
+.trim-handle.left-handle{border-radius:2px 0 0 2px}
+.trim-handle.right-handle{border-radius:0 2px 2px 0}
+.playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--gold);pointer-events:none;z-index:5}
+.playhead::before{content:'▼';position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--gold)}
+.trim-time-inputs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.time-input-group{display:flex;flex-direction:column;gap:4px}
+.time-input-group label{font-size:11px;color:var(--muted);font-weight:500}
+.time-input-group input{background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:8px;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;outline:none;transition:border-color .15s}
+.time-input-group input:focus{border-color:var(--accent)}
+.trim-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.trim-preset{background:var(--s2);border:1px solid var(--border);color:var(--muted);padding:8px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;text-align:center;transition:all .15s;font-family:'DM Sans',sans-serif}
+.trim-preset:hover{border-color:var(--accent);color:var(--accent);background:rgba(255,45,85,.05)}
+.duration-badge{background:rgba(255,45,85,.12);border:1px solid rgba(255,45,85,.2);color:var(--accent);font-size:12px;font-weight:600;padding:4px 10px;border-radius:6px;display:inline-flex;align-items:center;gap:4px}
+
+/* ---- FORMAT ---- */
+.format-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.format-card{background:var(--s2);border:1.5px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;cursor:pointer;transition:all .18s}
+.format-card:hover{border-color:var(--accent);background:rgba(255,45,85,.05)}
+.format-card.active{border-color:var(--accent);background:rgba(255,45,85,.1)}
+.format-ratio{font-family:'Syne',sans-serif;font-size:16px;font-weight:800}
+.format-name{font-size:10px;color:var(--muted);margin-top:2px}
+.format-icon{font-size:20px;margin-bottom:4px}
+.format-card.active .format-ratio{color:var(--accent)}
+
+/* ---- EXPORT ---- */
+.export-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;letter-spacing:.3px;transition:all .2s;position:relative;overflow:hidden}
+.export-btn:hover{opacity:.9;transform:translateY(-1px)}
+.export-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.export-btn::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);transform:translateX(-100%);transition:transform .4s}
+.export-btn:hover::after{transform:translateX(100%)}
+.progress-wrap{margin-top:10px;display:none}
+.progress-track{height:6px;background:var(--s3);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--gold));border-radius:3px;transition:width .15s;width:0%}
+.progress-label{font-size:11px;color:var(--muted);margin-top:5px;text-align:center}
+.download-ready{display:none;flex-direction:column;align-items:center;gap:10px;padding:14px;background:rgba(48,209,88,.08);border:1px solid rgba(48,209,88,.2);border-radius:12px}
+.download-ready p{font-size:13px;color:var(--green);font-weight:500}
+.btn-download{background:var(--green);color:#000;border:none;padding:10px 24px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:6px;transition:opacity .15s}
+.btn-download:hover{opacity:.85}
+
+/* ---- SIDEBAR ---- */
+.s-label{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat-item{background:var(--s2);border-radius:10px;padding:10px 12px;border:1px solid var(--border)}
+.stat-num{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;line-height:1}
+.stat-lbl{font-size:10px;color:var(--muted);margin-top:3px}
+.viral-meter{background:var(--s2);border-radius:12px;padding:14px;border:1px solid var(--border)}
+.vm-top{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px}
+.vm-score{font-family:'Syne',sans-serif;font-size:36px;font-weight:900;line-height:1;background:linear-gradient(90deg,var(--accent),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.vm-label{font-size:11px;color:var(--muted);line-height:1.4;text-align:right}
+.vm-bar{height:6px;background:var(--s3);border-radius:3px;overflow:hidden}
+.vm-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--gold));border-radius:3px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.vm-desc{font-size:11px;color:var(--muted);margin-top:6px}
+.toggle-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-label{font-size:13px}
+.toggle-sub{font-size:10px;color:var(--muted)}
+.toggle-sw{width:38px;height:21px;background:var(--s3);border:1px solid var(--border2);border-radius:10px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+.toggle-sw.on{background:var(--accent);border-color:var(--accent)}
+.toggle-sw::after{content:'';position:absolute;width:15px;height:15px;background:white;border-radius:50%;top:2px;left:2px;transition:left .18s}
+.toggle-sw.on::after{left:20px}
+.settings-card{background:var(--s2);border-radius:12px;padding:14px;border:1px solid var(--border)}
+.speed-btns{display:flex;gap:4px}
+.speed-btn{flex:1;padding:5px 0;background:var(--s3);border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s;font-family:'DM Sans',sans-serif}
+.speed-btn.active{background:rgba(10,132,255,.15);border-color:var(--blue);color:var(--blue)}
+.tips-card{background:linear-gradient(135deg,rgba(191,90,242,.08),rgba(10,132,255,.06));border:1px solid rgba(191,90,242,.15);border-radius:12px;padding:14px}
+.tip-item{display:flex;gap:8px;font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5}
+.tip-item:last-child{margin-bottom:0}
+.tip-icon{font-size:14px;flex-shrink:0;margin-top:1px}
+.divider{height:1px;background:var(--border)}
+
+/* ---- TOAST ---- */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--s3);border:1px solid var(--border2);color:var(--text);padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;z-index:999;transform:translateY(80px);opacity:0;transition:all .3s;max-width:300px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-color:rgba(48,209,88,.3);background:rgba(48,209,88,.08);color:var(--green)}
+.toast.error{border-color:rgba(255,45,85,.3);background:rgba(255,45,85,.06);color:var(--accent)}
+
+/* scrollbar */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--s4);border-radius:2px}
+
+/* ---- AI PANEL ---- */
+.ai-panel-card{background:var(--s1);border-radius:16px;border:1px solid rgba(191,90,242,.2);overflow:hidden;position:relative}
+.ai-panel-card::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 0% 0%,rgba(191,90,242,.06) 0%,transparent 55%);pointer-events:none}
+.ai-panel-header{padding:16px 18px 0;display:flex;align-items:center;justify-content:space-between}
+.ai-badge{display:flex;align-items:center;gap:8px}
+.ai-orb{width:32px;height:32px;background:linear-gradient(135deg,var(--purple),var(--blue));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.ai-panel-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;letter-spacing:.2px}
+.ai-panel-sub{font-size:11px;color:var(--muted)}
+.ai-key-input{background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:8px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none;width:100%;transition:border-color .15s;margin-top:2px}
+.ai-key-input:focus{border-color:var(--purple)}
+.ai-key-input::placeholder{color:var(--muted)}
+.ai-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin:12px 18px 0;overflow-x:auto}
+.ai-tab{padding:8px 14px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s;font-family:'DM Sans',sans-serif;background:none;border-left:none;border-right:none;border-top:none}
+.ai-tab:hover{color:var(--text)}
+.ai-tab.active{color:var(--purple);border-bottom-color:var(--purple)}
+.ai-body{padding:16px 18px 18px}
+.ai-context-input{background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:10px 12px;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;width:100%;resize:none;line-height:1.5;transition:border-color .15s}
+.ai-context-input:focus{border-color:var(--purple)}
+.ai-context-input::placeholder{color:var(--muted)}
+.btn-ai{width:100%;padding:11px;background:linear-gradient(135deg,var(--purple),var(--blue));color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;letter-spacing:.3px;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-ai:hover{opacity:.88;transform:translateY(-1px)}
+.btn-ai:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.ai-result-box{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:12px;display:none;min-height:80px}
+.ai-result-box.show{display:block}
+.ai-loading{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px}
+.ai-spinner{width:18px;height:18px;border:2px solid var(--border2);border-top-color:var(--purple);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ai-error{color:var(--accent);font-size:12px;line-height:1.5}
+
+/* viral analysis result */
+.viral-score-big{display:flex;align-items:center;gap:14px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.vb-score{font-family:'Syne',sans-serif;font-size:52px;font-weight:900;line-height:1;background:linear-gradient(135deg,var(--accent),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.vb-info{flex:1}
+.vb-title{font-size:15px;font-weight:700;font-family:'Syne',sans-serif;margin-bottom:3px}
+.vb-sub{font-size:11px;color:var(--muted);line-height:1.5}
+.factor-row{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.factor-item{display:flex;flex-direction:column;gap:3px}
+.factor-top{display:flex;justify-content:space-between;align-items:center}
+.factor-name{font-size:11px;color:var(--muted);font-weight:500}
+.factor-score{font-size:11px;font-weight:700}
+.factor-bar{height:3px;background:var(--s3);border-radius:2px;overflow:hidden}
+.factor-fill{height:100%;border-radius:2px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.insight-list{display:flex;flex-direction:column;gap:6px}
+.insight-item{display:flex;gap:8px;font-size:12px;line-height:1.5;padding:8px 10px;border-radius:8px}
+.insight-item.good{background:rgba(48,209,88,.06);border:1px solid rgba(48,209,88,.12);color:#c0f0d0}
+.insight-item.warn{background:rgba(255,214,10,.06);border:1px solid rgba(255,214,10,.12);color:#f5e898}
+.insight-item.bad{background:rgba(255,45,85,.06);border:1px solid rgba(255,45,85,.12);color:#ffa0b0}
+.insight-icon{font-size:13px;flex-shrink:0;margin-top:1px}
+
+/* hook result */
+.hook-list{display:flex;flex-direction:column;gap:8px}
+.hook-item{background:var(--s3);border:1px solid var(--border);border-radius:10px;padding:12px;cursor:pointer;transition:all .18s;position:relative}
+.hook-item:hover{border-color:var(--purple);background:rgba(191,90,242,.08)}
+.hook-type{font-size:9px;font-weight:700;letter-spacing:.8px;color:var(--purple);margin-bottom:4px;text-transform:uppercase}
+.hook-text{font-size:13px;line-height:1.5;font-weight:500}
+.hook-why{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.4}
+.copy-btn{position:absolute;top:10px;right:10px;background:var(--s4);border:1px solid var(--border);color:var(--muted);font-size:10px;padding:3px 8px;border-radius:5px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.copy-btn:hover{color:var(--text);border-color:var(--border2)}
+
+/* title result */
+.title-platform{display:flex;flex-direction:column;gap:12px}
+.platform-block{border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.platform-header{background:var(--s3);padding:8px 12px;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600}
+.platform-titles{padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)}
+.title-row:last-child{border-bottom:none}
+.title-text{font-size:12px;line-height:1.4;flex:1}
+.ctr-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap;flex-shrink:0}
+.ctr-high{background:rgba(48,209,88,.15);color:var(--green)}
+.ctr-med{background:rgba(255,214,10,.12);color:var(--gold)}
+.title-copy{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:2px;transition:color .15s;flex-shrink:0}
+.title-copy:hover{color:var(--text)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.niche-btns{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.niche-btn{font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--s3);color:var(--muted);cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
+.niche-btn.active{background:rgba(191,90,242,.15);border-color:var(--purple);color:var(--purple)}
+.key-hint{font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5}
+.key-hint a{color:var(--blue);text-decoration:none}
+
+/* responsive */
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr}
+  .side-col{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <span class="logo">ClipViral</span>
+    <span class="logo-tag">AI Short Video Cutter</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="version-badge">v1.0</span>
+    <div class="topbar-right">Berjalan <b>100% di browser</b> · Tidak ada upload ke server</div>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- MAIN COL -->
+  <div class="main-col">
+
+    <!-- Upload Zone -->
+    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+      <div class="upload-icon-wrap">🎬</div>
+      <h2>Drop video di sini</h2>
+      <p>Seret & lepas file video kamu, atau klik untuk browse. Semua proses berjalan langsung di browser — privasi terjaga!</p>
+      <button class="btn-primary" onclick="event.stopPropagation();document.getElementById('fileInput').click()">Pilih Video</button>
+      <div class="supported-formats">
+        <span class="fmt-tag">MP4</span>
+        <span class="fmt-tag">MOV</span>
+        <span class="fmt-tag">WEBM</span>
+        <span class="fmt-tag">MKV</span>
+        <span class="fmt-tag">AVI</span>
+      </div>
+      <input type="file" id="fileInput" accept="video/*">
+    </div>
+
+    <!-- Player (hidden until video loaded) -->
+    <div class="player-card" id="playerCard" style="display:none">
+      <div class="player-wrap" onclick="togglePlay()">
+        <video id="mainVideo" preload="metadata"></video>
+        <div class="player-overlay">
+          <div class="play-btn-big" id="playIcon">⏸</div>
+        </div>
+      </div>
+      <div class="player-controls">
+        <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1">
+        <div class="time-display">
+          <span><b id="curTime">0:00</b></span>
+          <span><b id="totTime">0:00</b></span>
+        </div>
+        <div class="ctrl-row">
+          <button class="ctrl-btn" onclick="skipBy(-5)" title="Mundur 5 detik">⏮ 5s</button>
+          <button class="ctrl-btn play-pause" id="playPauseBtn" onclick="togglePlay()">⏸</button>
+          <button class="ctrl-btn" onclick="skipBy(5)" title="Maju 5 detik">5s ⏭</button>
+          <button class="ctrl-btn" onclick="setTrimStart()" title="Set awal trim ke posisi ini" style="font-size:11px;width:auto;padding:0 10px">[ Set Awal</button>
+          <button class="ctrl-btn" onclick="setTrimEnd()" title="Set akhir trim ke posisi ini" style="font-size:11px;width:auto;padding:0 10px">Set Akhir ]</button>
+          <div class="vol-row">
+            <span style="font-size:14px">🔊</span>
+            <input type="range" id="volBar" min="0" max="1" step="0.05" value="1">
+          </div>
+        </div>
+      </div>
+      <div class="filename-label" id="filenameLabel"></div>
+    </div>
+
+    <!-- Trim Section -->
+    <div class="section-card" id="trimCard" style="display:none">
+      <div class="section-title"><div class="dot"></div>Potong Klip</div>
+
+      <div class="timeline-container" id="timelineContainer">
+        <canvas class="waveform-canvas" id="waveCanvas"></canvas>
+        <div class="trim-overlay" id="trimOverlay"></div>
+        <div class="trim-handle left-handle" id="leftHandle"></div>
+        <div class="trim-handle right-handle" id="rightHandle"></div>
+        <div class="playhead" id="playhead"></div>
+      </div>
+
+      <div class="trim-time-inputs">
+        <div class="time-input-group">
+          <label>⏱ Mulai (detik)</label>
+          <input type="number" id="startInput" min="0" step="0.1" value="0" oninput="onStartInput()">
+        </div>
+        <div class="time-input-group">
+          <label>⏱ Selesai (detik)</label>
+          <input type="number" id="endInput" min="0" step="0.1" value="10" oninput="onEndInput()">
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div class="duration-badge" id="durationBadge">✂️ Durasi: 0:00</div>
+        <div style="font-size:12px;color:var(--muted)" id="sizeEstimate"></div>
+      </div>
+
+      <div>
+        <div class="s-label" style="margin-bottom:8px">Preset cepat</div>
+        <div class="trim-actions">
+          <div class="trim-preset" onclick="setPreset(15)">⚡ 15 dtk<br><span style="font-size:9px;color:var(--muted)">TikTok hook</span></div>
+          <div class="trim-preset" onclick="setPreset(30)">🔥 30 dtk<br><span style="font-size:9px;color:var(--muted)">IG Reels</span></div>
+          <div class="trim-preset" onclick="setPreset(60)">📱 60 dtk<br><span style="font-size:9px;color:var(--muted)">Shorts max</span></div>
+          <div class="trim-preset" onclick="setPreset(90)">🎬 90 dtk<br><span style="font-size:9px;color:var(--muted)">Extended</span></div>
+          <div class="trim-preset" onclick="setTrimAll()">↔️ Semua<br><span style="font-size:9px;color:var(--muted)">Full video</span></div>
+          <div class="trim-preset" onclick="setFirstHalf()">½ Pertama<br><span style="font-size:9px;color:var(--muted)">First half</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Format Section -->
+    <div class="section-card" id="formatCard" style="display:none">
+      <div class="section-title"><div class="dot"></div>Format Output</div>
+      <div class="format-grid">
+        <div class="format-card active" data-ratio="original" onclick="selectFormat(this)">
+          <div class="format-icon">📹</div>
+          <div class="format-ratio">Asli</div>
+          <div class="format-name">Tanpa crop</div>
+        </div>
+        <div class="format-card" data-ratio="916" onclick="selectFormat(this)">
+          <div class="format-icon">📱</div>
+          <div class="format-ratio">9:16</div>
+          <div class="format-name">TikTok / Reels</div>
+        </div>
+        <div class="format-card" data-ratio="11" onclick="selectFormat(this)">
+          <div class="format-icon">⬛</div>
+          <div class="format-ratio">1:1</div>
+          <div class="format-name">Feed Square</div>
+        </div>
+        <div class="format-card" data-ratio="169" onclick="selectFormat(this)">
+          <div class="format-icon">📺</div>
+          <div class="format-ratio">16:9</div>
+          <div class="format-name">YouTube</div>
+        </div>
+        <div class="format-card" data-ratio="45" onclick="selectFormat(this)">
+          <div class="format-icon">🖼</div>
+          <div class="format-ratio">4:5</div>
+          <div class="format-name">IG Portrait</div>
+        </div>
+        <div class="format-card" data-ratio="219" onclick="selectFormat(this)">
+          <div class="format-icon">🎞</div>
+          <div class="format-ratio">21:9</div>
+          <div class="format-name">Cinematic</div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px">
+        <div class="s-label" style="margin-bottom:8px">Kualitas output</div>
+        <div class="speed-btns" id="qualityBtns">
+          <div class="speed-btn" onclick="selectQuality(this,'low')">Hemat<br><span style="font-size:9px;font-weight:400">360p</span></div>
+          <div class="speed-btn active" onclick="selectQuality(this,'medium')">Standar<br><span style="font-size:9px;font-weight:400">720p</span></div>
+          <div class="speed-btn" onclick="selectQuality(this,'high')">HD<br><span style="font-size:9px;font-weight:400">1080p</span></div>
+          <div class="speed-btn" onclick="selectQuality(this,'original')">Asli<br><span style="font-size:9px;font-weight:400">Max</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export Section -->
+    <div class="section-card" id="exportCard" style="display:none">
+      <div class="section-title"><div class="dot"></div>Export & Download</div>
+      <button class="export-btn" id="exportBtn" onclick="startExport()">✂️ Potong & Download Video</button>
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-label" id="progressLabel">Memproses...</div>
+      </div>
+      <div class="download-ready" id="downloadReady">
+        <p>✅ Klip siap didownload!</p>
+        <a id="downloadLink" download>
+          <button class="btn-download">⬇ Download Video</button>
+        </a>
+        <button onclick="resetDownload()" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">Potong lagi</button>
+      </div>
+    </div>
+
+    <!-- AI Panel -->
+    <div class="ai-panel-card" id="aiPanelCard" style="display:none">
+      <div class="ai-panel-header">
+        <div class="ai-badge">
+          <div class="ai-orb">✦</div>
+          <div>
+            <div class="ai-panel-title">AI Viral Analyzer</div>
+            <div class="ai-panel-sub">Analisis potensi viral · Pertajam hook · Judul CTR tinggi</div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:12px 18px 0">
+        <div style="font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.8px;text-transform:uppercase;margin-bottom:5px">Anthropic API Key</div>
+        <input type="password" class="ai-key-input" id="apiKeyInput" placeholder="sk-ant-api03-..." autocomplete="off">
+        <div class="key-hint">Key kamu aman — tidak disimpan ke server, hanya dipakai di browser. Dapatkan di <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></div>
+      </div>
+      <div class="ai-tabs">
+        <button class="ai-tab active" onclick="switchTab('viral',this)">🔥 Viral Score</button>
+        <button class="ai-tab" onclick="switchTab('hook',this)">⚡ Pertajam Hook</button>
+        <button class="ai-tab" onclick="switchTab('title',this)">🎯 Judul CTR</button>
+      </div>
+      <div class="ai-body">
+
+        <!-- TAB: Viral -->
+        <div class="tab-content active" id="tab-viral">
+          <div style="margin-bottom:10px">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:5px">Tentang konten video kamu</div>
+            <textarea class="ai-context-input" id="viralContext" rows="3" placeholder="Contoh: Vlog perjalanan ke Labuan Bajo, momen pertama kali lihat Komodo, vibes petualangan, target 18-30 tahun..."></textarea>
+          </div>
+          <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:11px;color:var(--muted)">Durasi klip terpilih:</div>
+            <div id="viralDurInfo" style="font-size:13px;font-weight:700;color:var(--accent);font-family:'Syne',sans-serif">— (pilih trim dulu)</div>
+          </div>
+          <button class="btn-ai" id="btnAnalyzeViral" onclick="runViralAnalysis()">✦ Analisis Potensi Viral</button>
+          <div class="ai-result-box" id="viralResult"></div>
+        </div>
+
+        <!-- TAB: Hook -->
+        <div class="tab-content" id="tab-hook">
+          <div style="margin-bottom:10px">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:5px">Apa isi/momen klip ini?</div>
+            <textarea class="ai-context-input" id="hookContext" rows="3" placeholder="Contoh: Reaksi pertama kali nyoba durian, ekspresi kaget dan dramatis, setting pasar tradisional..."></textarea>
+          </div>
+          <div style="margin-bottom:10px">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Niche konten</div>
+            <div class="niche-btns" id="nicheBtns">
+              <div class="niche-btn active" onclick="toggleNiche(this)">Travel</div>
+              <div class="niche-btn" onclick="toggleNiche(this)">Kuliner</div>
+              <div class="niche-btn" onclick="toggleNiche(this)">Lifestyle</div>
+              <div class="niche-btn" onclick="toggleNiche(this)">Komedi</div>
+              <div class="niche-btn" onclick="toggleNiche(this)">Edukasi</div>
+              <div class="niche-btn" onclick="toggleNiche(this)">Motivasi</div>
+              <div class="niche-btn" onclick="toggleNiche(this)">Gaming</div>
+              <div class="niche-btn" onclick="toggleNiche(this)">Bisnis</div>
+            </div>
+          </div>
+          <button class="btn-ai" id="btnHook" onclick="runHookGen()">⚡ Buat 5 Hook Kuat</button>
+          <div class="ai-result-box" id="hookResult"></div>
+        </div>
+
+        <!-- TAB: Title -->
+        <div class="tab-content" id="tab-title">
+          <div style="margin-bottom:10px">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:5px">Topik / isi video klip</div>
+            <textarea class="ai-context-input" id="titleContext" rows="3" placeholder="Contoh: Tips hemat budget liburan Bali 3 hari 2 malam dengan backpacker style..."></textarea>
+          </div>
+          <div style="margin-bottom:10px">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Target platform</div>
+            <div class="niche-btns" id="platformBtns">
+              <div class="niche-btn active" onclick="this.classList.toggle('active')">TikTok</div>
+              <div class="niche-btn active" onclick="this.classList.toggle('active')">Instagram</div>
+              <div class="niche-btn" onclick="this.classList.toggle('active')">YouTube Shorts</div>
+              <div class="niche-btn" onclick="this.classList.toggle('active')">Twitter/X</div>
+            </div>
+          </div>
+          <button class="btn-ai" id="btnTitle" onclick="runTitleGen()">🎯 Generate Judul CTR Tinggi</button>
+          <div class="ai-result-box" id="titleResult"></div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- end main-col -->
+
+  <!-- SIDEBAR -->
+  <div class="side-col">
+
+    <div>
+      <div class="s-label">Info Video</div>
+      <div class="stat-grid">
+        <div class="stat-item"><div class="stat-num" id="statDur" style="color:var(--accent)">—</div><div class="stat-lbl">Durasi asli</div></div>
+        <div class="stat-item"><div class="stat-num" id="statClip" style="color:var(--gold)">—</div><div class="stat-lbl">Durasi klip</div></div>
+        <div class="stat-item"><div class="stat-num" id="statRes" style="color:var(--blue);font-size:13px">—</div><div class="stat-lbl">Resolusi</div></div>
+        <div class="stat-item"><div class="stat-num" id="statSize" style="color:var(--green);font-size:14px">—</div><div class="stat-lbl">Ukuran file</div></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div>
+      <div class="s-label">Viral Score Klip</div>
+      <div class="viral-meter">
+        <div class="vm-top">
+          <div class="vm-score" id="vmScore">—</div>
+          <div class="vm-label" id="vmLabel">Upload video<br>untuk skor</div>
+        </div>
+        <div class="vm-bar"><div class="vm-fill" id="vmFill" style="width:0%"></div></div>
+        <div class="vm-desc" id="vmDesc">Skor dihitung dari durasi ideal untuk platform short-form.</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div>
+      <div class="s-label">Pengaturan</div>
+      <div class="settings-card">
+        <div class="toggle-row">
+          <div><div class="toggle-label">Preview crop</div><div class="toggle-sub">Tampilkan bingkai format</div></div>
+          <div class="toggle-sw on" id="tw1" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Auto-play setelah set</div><div class="toggle-sub">Putar otomatis dari titik awal</div></div>
+          <div class="toggle-sw on" id="tw2" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Simpan sesi</div><div class="toggle-sub">Ingat posisi trim terakhir</div></div>
+          <div class="toggle-sw" id="tw3" onclick="this.classList.toggle('on')"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div>
+      <div class="s-label">Tips Konten Viral</div>
+      <div class="tips-card">
+        <div class="tip-item"><span class="tip-icon">⚡</span>Hook kuat di 3 detik pertama — langsung tunjukkan yang paling menarik!</div>
+        <div class="tip-item"><span class="tip-icon">📏</span>Durasi optimal TikTok: 15–35 detik. Reels: 7–15 detik.</div>
+        <div class="tip-item"><span class="tip-icon">🔊</span>Pastikan audio jernih — 80% penonton TikTok pakai earphone.</div>
+        <div class="tip-item"><span class="tip-icon">📱</span>Format 9:16 mengisi layar penuh = engagement lebih tinggi.</div>
+        <div class="tip-item"><span class="tip-icon">✂️</span>Potong semua jeda diam/blank. Setiap detik harus bernilai!</div>
+      </div>
+    </div>
+
+  </div><!-- end side-col -->
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== STATE =====
+const state = {
+  videoFile: null,
+  videoURL: null,
+  duration: 0,
+  trimStart: 0,
+  trimEnd: 10,
+  ratio: 'original',
+  quality: 'medium',
+  dragging: null,
+  outputBlob: null,
+};
+
+// ===== ELEMENTS =====
+const video = document.getElementById('mainVideo');
+const seekBar = document.getElementById('seekBar');
+const volBar = document.getElementById('volBar');
+const leftHandle = document.getElementById('leftHandle');
+const rightHandle = document.getElementById('rightHandle');
+const trimOverlay = document.getElementById('trimOverlay');
+const playhead = document.getElementById('playhead');
+const startInput = document.getElementById('startInput');
+const endInput = document.getElementById('endInput');
+const waveCanvas = document.getElementById('waveCanvas');
+const timelineContainer = document.getElementById('timelineContainer');
+
+// ===== UPLOAD =====
+const uploadZone = document.getElementById('uploadZone');
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('dragover'); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith('video/')) loadVideo(f); });
+document.getElementById('fileInput').onchange = e => { if (e.target.files[0]) loadVideo(e.target.files[0]); };
+
+function loadVideo(file) {
+  state.videoFile = file;
+  if (state.videoURL) URL.revokeObjectURL(state.videoURL);
+  state.videoURL = URL.createObjectURL(file);
+  video.src = state.videoURL;
+  video.onloadedmetadata = () => {
+    state.duration = video.duration;
+    state.trimStart = 0;
+    state.trimEnd = Math.min(60, state.duration);
+    seekBar.max = state.duration;
+    document.getElementById('totTime').textContent = fmtTime(state.duration);
+    document.getElementById('statDur').textContent = fmtTime(state.duration);
+    document.getElementById('statRes').textContent = video.videoWidth + '×' + video.videoHeight;
+    document.getElementById('statSize').textContent = fmtSize(file.size);
+    document.getElementById('filenameLabel').textContent = file.name;
+    uploadZone.style.display = 'none';
+    ['playerCard','trimCard','formatCard','exportCard','aiPanelCard'].forEach(id => document.getElementById(id).style.display = '');
+    updateInputs();
+    updateTimeline();
+    updateViralScore();
+    drawWaveform();
+    showToast('Video berhasil dimuat! ✓', 'success');
+  };
+}
+
+// ===== PLAYER =====
+video.ontimeupdate = () => {
+  const t = video.currentTime;
+  seekBar.value = t;
+  document.getElementById('curTime').textContent = fmtTime(t);
+  const pct = state.duration ? t / state.duration * 100 : 0;
+  playhead.style.left = pct + '%';
+  if (t >= state.trimEnd) { video.pause(); video.currentTime = state.trimEnd; }
+};
+seekBar.oninput = () => { video.currentTime = parseFloat(seekBar.value); };
+volBar.oninput = () => { video.volume = parseFloat(volBar.value); };
+
+function togglePlay() {
+  if (video.paused) {
+    if (video.currentTime >= state.trimEnd) video.currentTime = state.trimStart;
+    video.play();
+    document.getElementById('playPauseBtn').textContent = '⏸';
+    document.getElementById('playIcon').textContent = '⏸';
+  } else {
+    video.pause();
+    document.getElementById('playPauseBtn').textContent = '▶';
+    document.getElementById('playIcon').textContent = '▶';
+  }
+}
+video.onpause = () => { document.getElementById('playPauseBtn').textContent = '▶'; document.getElementById('playIcon').textContent = '▶'; };
+video.onplay = () => { document.getElementById('playPauseBtn').textContent = '⏸'; document.getElementById('playIcon').textContent = '⏸'; };
+
+function skipBy(sec) { video.currentTime = Math.max(0, Math.min(state.duration, video.currentTime + sec)); }
+function setTrimStart() { state.trimStart = Math.max(0, video.currentTime - 0.001); if (state.trimStart >= state.trimEnd) state.trimEnd = Math.min(state.duration, state.trimStart + 1); updateInputs(); updateTimeline(); updateViralScore(); updateDurInfo(); showToast('Awal klip di-set ✓'); }
+function setTrimEnd() { state.trimEnd = Math.min(state.duration, video.currentTime + 0.001); if (state.trimEnd <= state.trimStart) state.trimStart = Math.max(0, state.trimEnd - 1); updateInputs(); updateTimeline(); updateViralScore(); updateDurInfo(); showToast('Akhir klip di-set ✓'); }
+function updateDurInfo() { const d = state.trimEnd - state.trimStart; const el = document.getElementById('viralDurInfo'); if (el) el.textContent = d.toFixed(1) + ' detik (' + fmtTime(d) + ')'; }
+
+// ===== TIMELINE DRAG =====
+function pctToTime(pct) { return Math.max(0, Math.min(state.duration, pct * state.duration)); }
+function timeToPct(t) { return state.duration ? t / state.duration : 0; }
+
+function updateTimeline() {
+  const lp = timeToPct(state.trimStart) * 100;
+  const rp = timeToPct(state.trimEnd) * 100;
+  leftHandle.style.left = lp + '%';
+  rightHandle.style.left = rp + '%';
+  trimOverlay.style.left = lp + '%';
+  trimOverlay.style.width = (rp - lp) + '%';
+}
+
+function getRelX(e, el) {
+  const r = el.getBoundingClientRect();
+  const cx = (e.touches ? e.touches[0].clientX : e.clientX);
+  return Math.max(0, Math.min(1, (cx - r.left) / r.width));
+}
+
+leftHandle.addEventListener('mousedown', e => { e.preventDefault(); state.dragging = 'left'; });
+rightHandle.addEventListener('mousedown', e => { e.preventDefault(); state.dragging = 'right'; });
+leftHandle.addEventListener('touchstart', e => { state.dragging = 'left'; }, {passive:true});
+rightHandle.addEventListener('touchstart', e => { state.dragging = 'right'; }, {passive:true});
+
+document.addEventListener('mousemove', e => handleDrag(e));
+document.addEventListener('touchmove', e => handleDrag(e), {passive:true});
+document.addEventListener('mouseup', () => { state.dragging = null; });
+document.addEventListener('touchend', () => { state.dragging = null; });
+
+function handleDrag(e) {
+  if (!state.dragging) return;
+  const pct = getRelX(e, timelineContainer);
+  const t = pctToTime(pct);
+  if (state.dragging === 'left') {
+    state.trimStart = Math.min(t, state.trimEnd - 0.5);
+    if (document.getElementById('tw2').classList.contains('on')) { video.currentTime = state.trimStart; }
+  } else {
+    state.trimEnd = Math.max(t, state.trimStart + 0.5);
+  }
+  state.trimStart = Math.max(0, state.trimStart);
+  state.trimEnd = Math.min(state.duration, state.trimEnd);
+  updateInputs();
+  updateTimeline();
+  updateViralScore();
+}
+
+// Click on timeline to seek
+timelineContainer.addEventListener('click', e => {
+  if (state.dragging) return;
+  const pct = getRelX(e, timelineContainer);
+  video.currentTime = pctToTime(pct);
+});
+
+// ===== INPUTS =====
+function onStartInput() {
+  const v = parseFloat(startInput.value);
+  if (!isNaN(v)) { state.trimStart = Math.max(0, Math.min(v, state.trimEnd - 0.1)); updateTimeline(); updateViralScore(); }
+}
+function onEndInput() {
+  const v = parseFloat(endInput.value);
+  if (!isNaN(v)) { state.trimEnd = Math.min(state.duration, Math.max(v, state.trimStart + 0.1)); updateTimeline(); updateViralScore(); }
+}
+function updateInputs() {
+  startInput.value = state.trimStart.toFixed(1);
+  endInput.value = state.trimEnd.toFixed(1);
+  const dur = state.trimEnd - state.trimStart;
+  document.getElementById('durationBadge').textContent = '✂️ Durasi: ' + fmtTime(dur);
+  document.getElementById('statClip').textContent = fmtTime(dur);
+}
+
+// ===== PRESETS =====
+function setPreset(sec) {
+  state.trimStart = 0;
+  state.trimEnd = Math.min(sec, state.duration);
+  updateInputs(); updateTimeline(); updateViralScore();
+  showToast('Preset ' + sec + ' detik diterapkan ✓');
+}
+function setTrimAll() {
+  state.trimStart = 0; state.trimEnd = state.duration;
+  updateInputs(); updateTimeline(); updateViralScore();
+  showToast('Dipilih seluruh video');
+}
+function setFirstHalf() {
+  state.trimStart = 0; state.trimEnd = state.duration / 2;
+  updateInputs(); updateTimeline(); updateViralScore();
+  showToast('Dipilih setengah pertama');
+}
+
+// ===== FORMAT =====
+function selectFormat(el) {
+  document.querySelectorAll('.format-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  state.ratio = el.dataset.ratio;
+}
+function selectQuality(el, q) {
+  document.querySelectorAll('#qualityBtns .speed-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  state.quality = q;
+}
+
+// ===== WAVEFORM (visual only — approximated) =====
+function drawWaveform() {
+  const canvas = waveCanvas;
+  const ctx = canvas.getContext('2d');
+  const W = timelineContainer.offsetWidth;
+  const H = timelineContainer.offsetHeight;
+  canvas.width = W; canvas.height = H;
+  ctx.clearRect(0, 0, W, H);
+
+  // Try to decode audio for real waveform
+  if (state.videoFile) {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const buffer = await audioCtx.decodeAudioData(e.target.result);
+        const data = buffer.getChannelData(0);
+        const step = Math.ceil(data.length / W);
+        const amp = H / 2;
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(255,45,85,0.5)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < W; i++) {
+          let max = 0;
+          for (let j = 0; j < step; j++) {
+            const v = Math.abs(data[i * step + j] || 0);
+            if (v > max) max = v;
+          }
+          const y = max * amp * 0.85;
+          ctx.moveTo(i, amp - y);
+          ctx.lineTo(i, amp + y);
+        }
+        ctx.stroke();
+        audioCtx.close();
+      } catch {
+        drawFakeWaveform(ctx, W, H);
+      }
+    };
+    reader.onerror = () => drawFakeWaveform(ctx, W, H);
+    reader.readAsArrayBuffer(state.videoFile);
+  } else {
+    drawFakeWaveform(ctx, W, H);
+  }
+}
+
+function drawFakeWaveform(ctx, W, H) {
+  const amp = H / 2;
+  ctx.strokeStyle = 'rgba(255,45,85,0.35)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i < W; i++) {
+    const noise = Math.sin(i * 0.3) * 0.3 + Math.sin(i * 0.07) * 0.5 + (Math.random() * 0.2);
+    const y = Math.abs(noise) * amp * 0.8;
+    ctx.moveTo(i, amp - y); ctx.lineTo(i, amp + y);
+  }
+  ctx.stroke();
+}
+
+window.addEventListener('resize', () => { if (state.videoFile) drawWaveform(); });
+
+// ===== VIRAL SCORE =====
+function updateViralScore() {
+  if (!state.duration) return;
+  const dur = state.trimEnd - state.trimStart;
+  // Score based on ideal short video length
+  let score = 0;
+  if (dur >= 7 && dur <= 15) score = 95 + Math.random() * 5;
+  else if (dur > 15 && dur <= 30) score = 85 + Math.random() * 8;
+  else if (dur > 30 && dur <= 60) score = 70 + Math.random() * 10;
+  else if (dur > 60 && dur <= 90) score = 55 + Math.random() * 10;
+  else if (dur < 7) score = 40 + dur * 5 + Math.random() * 10;
+  else score = 30 + Math.random() * 15;
+  score = Math.min(99, Math.round(score));
+
+  document.getElementById('vmScore').textContent = score + '%';
+  document.getElementById('vmFill').style.width = score + '%';
+
+  let label, desc;
+  if (score >= 90) { label = '🔥 Sangat<br>Viral'; desc = 'Durasi ideal! Kemungkinan tinggi di-push algoritma TikTok & Reels.'; }
+  else if (score >= 75) { label = '📈 Berpotensi<br>Viral'; desc = 'Durasi bagus. Pastikan 3 detik pertama langsung hook penonton!'; }
+  else if (score >= 55) { label = '📊 Standar'; desc = 'Bisa lebih baik. Coba potong ke 15–30 detik untuk engagement optimal.'; }
+  else { label = '⚠️ Perlu<br>Optimasi'; desc = 'Durasi terlalu panjang atau pendek. Sesuaikan untuk platform target.'; }
+  document.getElementById('vmLabel').innerHTML = label;
+  document.getElementById('vmDesc').textContent = desc;
+  updateInputs();
+}
+
+// ===== EXPORT (browser-side trim using MediaRecorder) =====
+function startExport() {
+  if (!state.videoFile) { showToast('Upload video dulu!', 'error'); return; }
+  const dur = state.trimEnd - state.trimStart;
+  if (dur <= 0) { showToast('Durasi tidak valid!', 'error'); return; }
+
+  document.getElementById('exportBtn').disabled = true;
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('downloadReady').style.display = 'none';
+  setProgress(5, 'Mempersiapkan...');
+
+  // Use canvas+video approach to trim
+  trimVideoInBrowser(state.trimStart, state.trimEnd);
+}
+
+async function trimVideoInBrowser(startSec, endSec) {
+  const dur = endSec - startSec;
+
+  // Quality map
+  const qMap = { low: 360, medium: 720, high: 1080, original: null };
+  const targetH = qMap[state.quality];
+
+  // Ratio map
+  const ratioMap = {
+    'original': null,
+    '916': [9, 16],
+    '11': [1, 1],
+    '169': [16, 9],
+    '45': [4, 5],
+    '219': [21, 9],
+  };
+  const ratioTarget = ratioMap[state.ratio];
+
+  // Set up canvas
+  const canvas = document.createElement('canvas');
+  const vw = video.videoWidth || 1280;
+  const vh = video.videoHeight || 720;
+
+  let cw, ch;
+  if (ratioTarget) {
+    const [rw, rh] = ratioTarget;
+    if (rw / rh > vw / vh) { cw = vw; ch = Math.round(vw * rh / rw); }
+    else { ch = vh; cw = Math.round(vh * rw / rh); }
+  } else { cw = vw; ch = vh; }
+
+  if (targetH && ch > targetH) { cw = Math.round(cw * targetH / ch); ch = targetH; }
+  // Make even
+  cw = cw % 2 === 0 ? cw : cw - 1;
+  ch = ch % 2 === 0 ? ch : ch - 1;
+
+  canvas.width = cw; canvas.height = ch;
+  const ctx = canvas.getContext('2d');
+
+  // Determine crop area from source
+  let sx = 0, sy = 0, sw = vw, sh = vh;
+  if (ratioTarget) {
+    const [rw, rh] = ratioTarget;
+    if (vw / vh > rw / rh) { sw = Math.round(vh * rw / rh); sx = Math.round((vw - sw) / 2); }
+    else { sh = Math.round(vw * rh / rw); sy = Math.round((vh - sh) / 2); }
+  }
+
+  // Check MediaRecorder support
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9'
+    : MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8'
+    : 'video/webm';
+
+  const stream = canvas.captureStream(30);
+
+  // Add audio from video element
+  let audioStream = null;
+  try {
+    if (video.captureStream) audioStream = video.captureStream();
+    else if (video.mozCaptureStream) audioStream = video.mozCaptureStream();
+    if (audioStream) {
+      audioStream.getAudioTracks().forEach(t => stream.addTrack(t));
+    }
+  } catch(e) {}
+
+  const chunks = [];
+  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: state.quality === 'low' ? 1000000 : state.quality === 'medium' ? 2500000 : 5000000 });
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+  let rafId;
+  let startRealTime;
+
+  recorder.onstart = () => {
+    video.currentTime = startSec;
+    video.muted = false;
+    video.playbackRate = 1;
+  };
+
+  video.onseeked = async () => {
+    if (!recorder || recorder.state !== 'recording') return;
+    await video.play();
+    startRealTime = performance.now();
+    function frame() {
+      const elapsed = (performance.now() - startRealTime) / 1000;
+      const pos = startSec + elapsed;
+      if (pos >= endSec || video.ended) {
+        video.pause();
+        recorder.stop();
+        cancelAnimationFrame(rafId);
+        return;
+      }
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, cw, ch);
+      const pct = Math.min(95, 10 + (elapsed / dur) * 85);
+      setProgress(pct, `Memproses... ${Math.round(elapsed)}/${Math.round(dur)} detik`);
+      rafId = requestAnimationFrame(frame);
+    }
+    rafId = requestAnimationFrame(frame);
+  };
+
+  recorder.onstop = () => {
+    setProgress(98, 'Menyimpan file...');
+    const blob = new Blob(chunks, { type: mimeType });
+    state.outputBlob = blob;
+    const url = URL.createObjectURL(blob);
+    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+    const baseName = state.videoFile.name.replace(/\.[^.]+$/, '');
+    const dl = document.getElementById('downloadLink');
+    dl.href = url;
+    dl.download = `${baseName}_clip_${Math.round(startSec)}s-${Math.round(endSec)}s.${ext}`;
+    setTimeout(() => {
+      setProgress(100, 'Selesai!');
+      document.getElementById('progressWrap').style.display = 'none';
+      document.getElementById('downloadReady').style.display = 'flex';
+      document.getElementById('exportBtn').disabled = false;
+      showToast('Klip berhasil dibuat! 🎉', 'success');
+    }, 400);
+  };
+
+  recorder.start(100);
+  setProgress(10, 'Memulai perekaman...');
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = label;
+}
+
+function resetDownload() {
+  document.getElementById('downloadReady').style.display = 'none';
+  document.getElementById('exportBtn').disabled = false;
+  if (state.outputBlob) { URL.revokeObjectURL(document.getElementById('downloadLink').href); state.outputBlob = null; }
+}
+
+// ===== AI FUNCTIONS =====
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.ai-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+function toggleNiche(el) { el.classList.toggle('active'); }
+
+function getApiKey() {
+  const k = document.getElementById('apiKeyInput').value.trim();
+  if (!k) { showToast('Masukkan API Key Anthropic dulu!', 'error'); return null; }
+  return k;
+}
+
+function getSelectedNiches() {
+  return [...document.querySelectorAll('#nicheBtns .niche-btn.active')].map(b => b.textContent).join(', ') || 'Umum';
+}
+
+function getSelectedPlatforms() {
+  return [...document.querySelectorAll('#platformBtns .niche-btn.active')].map(b => b.textContent).join(', ') || 'TikTok, Instagram';
+}
+
+async function callClaude(apiKey, systemPrompt, userPrompt, btnId, resultId) {
+  const btn = document.getElementById(btnId);
+  const resultBox = document.getElementById(resultId);
+  btn.disabled = true;
+  resultBox.className = 'ai-result-box show';
+  resultBox.innerHTML = '<div class="ai-loading"><div class="ai-spinner"></div>Claude sedang menganalisis...</div>';
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }]
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || 'API error ' + res.status);
+    }
+    const data = await res.json();
+    return data.content[0].text;
+  } catch (e) {
+    resultBox.innerHTML = '<div class="ai-error">❌ Error: ' + e.message + '<br><br>Pastikan API key benar dan punya kredit.</div>';
+    return null;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function runViralAnalysis() {
+  const apiKey = getApiKey(); if (!apiKey) return;
+  const dur = (state.trimEnd - state.trimStart).toFixed(1);
+  const ctx = document.getElementById('viralContext').value.trim() || 'Konten video pendek umum';
+  const ratio = state.ratio;
+  const fileName = state.videoFile?.name || 'unknown';
+
+  const system = `Kamu adalah ahli konten viral Indonesia dengan pengalaman 10 tahun di TikTok, Instagram Reels, dan YouTube Shorts. Kamu sangat memahami algoritma platform dan psikologi penonton Indonesia. Berikan analisis dalam format JSON yang valid SAJA, tanpa markdown fences, tanpa teks lain.`;
+  const user = `Analisis potensi viral klip video ini:
+- Durasi klip: ${dur} detik
+- Konteks/topik: ${ctx}
+- Format: ${ratio}
+- Nama file: ${fileName}
+
+Balas HANYA dengan JSON ini (tidak ada teks lain):
+{
+  "score": <angka 0-100>,
+  "verdict": "<emoji + label singkat, contoh: 🔥 Sangat Viral>",
+  "factors": [
+    {"name": "Durasi ideal", "score": <0-100>, "color": "<hex>"},
+    {"name": "Hook potential", "score": <0-100>, "color": "<hex>"},
+    {"name": "Topik relevance", "score": <0-100>, "color": "<hex>"},
+    {"name": "Engagement cues", "score": <0-100>, "color": "<hex>"}
+  ],
+  "insights": [
+    {"type": "good", "text": "<insight positif>"},
+    {"type": "warn", "text": "<peringatan atau saran>"},
+    {"type": "bad", "text": "<kelemahan yang perlu diperbaiki>"}
+  ],
+  "tip": "<1 tip paling penting untuk maksimalkan viral>"
+}`;
+
+  const raw = await callClaude(apiKey, system, user, 'btnAnalyzeViral', 'viralResult');
+  if (!raw) return;
+
+  try {
+    const d = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    const resultBox = document.getElementById('viralResult');
+    const scoreColor = d.score >= 80 ? 'linear-gradient(135deg,#ff2d55,#ffd60a)' : d.score >= 60 ? 'linear-gradient(135deg,#ffd60a,#ff6b35)' : 'linear-gradient(135deg,#0a84ff,#bf5af2)';
+    resultBox.innerHTML = `
+      <div class="viral-score-big">
+        <div class="vb-score" style="background:${scoreColor};-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">${d.score}</div>
+        <div class="vb-info">
+          <div class="vb-title">${d.verdict}</div>
+          <div class="vb-sub">${d.tip}</div>
+        </div>
+      </div>
+      <div class="factor-row">${(d.factors||[]).map(f => `
+        <div class="factor-item">
+          <div class="factor-top"><span class="factor-name">${f.name}</span><span class="factor-score" style="color:${f.color||'var(--accent)'}">${f.score}%</span></div>
+          <div class="factor-bar"><div class="factor-fill" style="width:${f.score}%;background:${f.color||'var(--accent)'}"></div></div>
+        </div>`).join('')}
+      </div>
+      <div class="insight-list">${(d.insights||[]).map(i => `
+        <div class="insight-item ${i.type}"><span class="insight-icon">${i.type==='good'?'✓':i.type==='warn'?'⚠':'✗'}</span>${i.text}</div>`).join('')}
+      </div>`;
+  } catch(e) {
+    document.getElementById('viralResult').innerHTML = '<div style="font-size:12px;color:var(--muted);line-height:1.6">' + raw + '</div>';
+  }
+}
+
+async function runHookGen() {
+  const apiKey = getApiKey(); if (!apiKey) return;
+  const ctx = document.getElementById('hookContext').value.trim();
+  if (!ctx) { showToast('Isi deskripsi konten dulu!', 'error'); return; }
+  const niche = getSelectedNiches();
+  const dur = (state.trimEnd - state.trimStart).toFixed(0);
+
+  const system = `Kamu adalah copywriter konten viral Indonesia terbaik. Spesialisasi: hook 3 detik pertama yang bikin penonton TIDAK bisa scroll. Kamu tahu psikologi trigger: rasa penasaran, FOMO, kejutan, kontroversi, dan relatable. Balas HANYA JSON valid, tanpa markdown.`;
+  const user = `Buat 5 hook kuat untuk konten ini:
+- Konten: ${ctx}
+- Niche: ${niche}
+- Durasi klip: ${dur} detik
+
+Balas HANYA dengan JSON array ini:
+[
+  {
+    "type": "<nama tipe hook, contoh: CURIOSITY GAP>",
+    "hook": "<teks hook dalam bahasa Indonesia, 1-2 kalimat max, untuk dibacakan di 3 detik pertama>",
+    "why": "<kenapa hook ini efektif, 1 kalimat>"
+  }
+]
+Buat 5 variasi dengan tipe berbeda: Curiosity Gap, Shock/Kontroversi, Relatable, FOMO, Story Loop.`;
+
+  const raw = await callClaude(apiKey, system, user, 'btnHook', 'hookResult');
+  if (!raw) return;
+
+  try {
+    const hooks = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    const resultBox = document.getElementById('hookResult');
+    resultBox.innerHTML = '<div class="hook-list">' + hooks.map((h,i) => `
+      <div class="hook-item">
+        <button class="copy-btn" onclick="copyText(this,'${encodeURIComponent(h.hook)}')">Copy</button>
+        <div class="hook-type">${h.type}</div>
+        <div class="hook-text">"${h.hook}"</div>
+        <div class="hook-why">💡 ${h.why}</div>
+      </div>`).join('') + '</div>';
+  } catch(e) {
+    document.getElementById('hookResult').innerHTML = '<div style="font-size:12px;color:var(--muted);line-height:1.7;white-space:pre-wrap">' + raw + '</div>';
+  }
+}
+
+async function runTitleGen() {
+  const apiKey = getApiKey(); if (!apiKey) return;
+  const ctx = document.getElementById('titleContext').value.trim();
+  if (!ctx) { showToast('Isi topik video dulu!', 'error'); return; }
+  const platforms = getSelectedPlatforms();
+
+  const system = `Kamu adalah pakar SEO dan CTR optimization untuk platform short-form video Indonesia (TikTok, IG Reels, YouTube Shorts). Kamu tahu formula judul yang memicu klik: angka spesifik, kata emosional, rasa penasaran, dan relevansi. Balas HANYA JSON valid.`;
+  const user = `Buat judul CTR tinggi untuk konten ini:
+- Topik: ${ctx}
+- Platform target: ${platforms}
+
+Balas HANYA JSON ini:
+{
+  "platforms": [
+    {
+      "name": "<nama platform>",
+      "icon": "<emoji>",
+      "titles": [
+        {"text": "<judul>", "ctr": "<High|Medium>", "note": "<alasan singkat>"},
+        {"text": "<judul>", "ctr": "<High|Medium>", "note": "<alasan singkat>"},
+        {"text": "<judul>", "ctr": "<High|Medium>", "note": "<alasan singkat>"}
+      ]
+    }
+  ]
+}
+Buat untuk setiap platform yang disebutkan. Judul harus natural bahasa Indonesia, bukan terjemahan kaku.`;
+
+  const raw = await callClaude(apiKey, system, user, 'btnTitle', 'titleResult');
+  if (!raw) return;
+
+  try {
+    const d = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    const resultBox = document.getElementById('titleResult');
+    resultBox.innerHTML = '<div class="title-platform">' + (d.platforms||[]).map(p => `
+      <div class="platform-block">
+        <div class="platform-header">${p.icon} ${p.name}</div>
+        <div class="platform-titles">${(p.titles||[]).map(t => `
+          <div class="title-row">
+            <div class="title-text">${t.text}<br><span style="font-size:10px;color:var(--muted)">${t.note||''}</span></div>
+            <span class="ctr-badge ${t.ctr==='High'?'ctr-high':'ctr-med'}">${t.ctr}</span>
+            <button class="title-copy" onclick="copyText(this,'${encodeURIComponent(t.text)}')" title="Copy">⎘</button>
+          </div>`).join('')}
+        </div>
+      </div>`).join('') + '</div>';
+  } catch(e) {
+    document.getElementById('titleResult').innerHTML = '<div style="font-size:12px;color:var(--muted);line-height:1.7;white-space:pre-wrap">' + raw + '</div>';
+  }
+}
+
+function copyText(btn, encoded) {
+  navigator.clipboard.writeText(decodeURIComponent(encoded)).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓';
+    setTimeout(() => btn.textContent = orig, 1500);
+    showToast('Disalin! ✓', 'success');
+  });
+}
+
+// ===== UTILS =====
+function fmtTime(s) {
+  if (!s || isNaN(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return m + ':' + String(sec).padStart(2, '0');
+}
+function fmtSize(bytes) {
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+let toastTimeout;
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => { t.className = 'toast'; }, 2800);
+}
+</script>
+</body>
+</html>
